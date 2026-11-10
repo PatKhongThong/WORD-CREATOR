@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WorldForge — Procedural Planetary Cartography & Civilization Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./css/app.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="wf-app-shell">
+    <!-- Left Navigation Rail -->
+    <aside class="wf-sidebar">
+      <a href="#/dashboard" class="wf-brand">
+        <span class="wf-brand-orb"></span>
+        <div>
+          <strong>WORLDFORGE</strong>
+          <small>PLANETARY CARTOGRAPHY</small>
+        </div>
+      </a>
+
+      <nav class="wf-nav" aria-label="Primary Navigation">
+        <a href="#/explorer" data-route="explorer" class="wf-nav-link is-active">
+          <span class="wf-nav-ico">◎</span><span>3D Planet Studio</span>
+        </a>
+        <a href="#/dashboard" data-route="dashboard" class="wf-nav-link">
+          <span class="wf-nav-ico">◈</span><span>Dashboard</span>
+        </a>
+        <a href="#/generator" data-route="generator" class="wf-nav-link">
+          <span class="wf-nav-ico">✦</span><span>World Generator</span>
+        </a>
+        <a href="#/civilizations" data-route="civilizations" class="wf-nav-link">
+          <span class="wf-nav-ico">⚑</span><span>Civilizations</span>
+        </a>
+        <a href="#/history" data-route="history" class="wf-nav-link">
+          <span class="wf-nav-ico">⧗</span><span>World History</span>
+        </a>
+        <a href="#/saved" data-route="saved" class="wf-nav-link">
+          <span class="wf-nav-ico">❖</span><span>Saved Worlds</span>
+          <b class="wf-nav-badge" id="nav-saved-count"></b>
+        </a>
+        <a href="#/settings" data-route="settings" class="wf-nav-link">
+          <span class="wf-nav-ico">⚙</span><span>Settings</span>
+        </a>
+      </nav>
+
+      <div class="wf-sidebar-foot">
+        <div class="wf-engine-status">
+          <span class="wf-status-dot"></span>
+          <span>Procedural Engine Ready</span>
+        </div>
+        <small>Seeded Simplex • Priority-Flood • Whittaker Biomes</small>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Column -->
+    <div class="wf-workspace">
+      <header class="wf-topbar">
+        <div class="wf-topbar-world">
+          <span class="wf-topbar-tag">ACTIVE PLANET</span>
+          <strong id="hdr-world-name">Synthesizing…</strong>
+          <span class="wf-topbar-meta" id="hdr-world-meta"></span>
+        </div>
+        <div class="wf-topbar-actions">
+          <button class="wf-btn wf-btn-ghost wf-btn-sm" id="hdr-save-btn" title="Save active world to IndexedDB">✦ Save World</button>
+          <button class="wf-btn wf-btn-generate wf-btn-sm" id="hdr-generate-btn" title="Immediately synthesize a new random planet">✦ GENERATE WORLD</button>
+        </div>
+      </header>
+
+      <main class="wf-view-mount" id="wf-view-mount"></main>
+    </div>
+  </div>
+
+  <!-- Generation Progress Overlay -->
+  <div class="wf-gen-overlay" id="wf-gen-overlay" hidden>
+    <div class="wf-gen-modal">
+      <div class="wf-gen-spinner"></div>
+      <h3>Synthesizing Planetary Data</h3>
+      <p id="wf-gen-stage">Initializing seed…</p>
+      <div class="wf-gen-progress"><div id="wf-gen-bar"></div></div>
+    </div>
+  </div>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
+

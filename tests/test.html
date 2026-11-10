@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>WorldForge 3D Planetary Verification Suite</title>
+  <style>
+    body { background:#080d18; color:#e9eff8; font-family:monospace; padding:20px; }
+    .pass { color:#46c98e; }
+    .fail { color:#e06458; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <h2>WorldForge 3D Planetary Verification Suite</h2>
+  <pre id="results">Running tests...</pre>
+  <div id="globe-test-host" style="width:480px;height:320px;"></div>
+  <script type="module">
+    import { generateWorld } from '../js/gen/index.js';
+    import { B } from '../js/gen/biomes.js';
+    import { getLayerCanvas, BASE_LAYERS } from '../js/render/layers.js';
+    import { GlobeViewer } from '../js/render/globe.js';
+    import { saveWorldRecord, listSavedWorlds, renameSavedWorld, deleteSavedWorld, clearAllSavedWorlds, serializeWorldJSON } from '../js/storage/db.js';
+    import { flagToSVG } from '../js/render/flags.js';
+
+    const log = [];
+    let failed = 0;
+    const assert = (name, cond, detail = '') => {
+      if (cond) log.push(`[PASS] ${name} ${detail}`);
+      else { failed++; log.push(`[FAIL] ${name} ${detail}`); }
+    };
+
+    try {
+      // 1. Determinism & Reproducibility
+      const cfgA = { seed: 'astralis-prime-777', resolution: 'fast', ocean: 0.68, continents: 5, countries: 12, historySpan: 3000, craterFrequency: 0.35, biomeVolcanic: 0.55 };
+      const w1 = generateWorld(cfgA);
+      const w2 = generateWorld(cfgA);
+      const wDiff = generateWorld({ ...cfgA, seed: 'borealis-secundus-999' });
+
+      assert('1. Same seed produces identical world fingerprint', w1.fingerprint === w2.fingerprint, `(#${w1.fingerprint} === #${w2.fingerprint})`);
+      assert('2. Same seed produces identical world name & population', w1.name === w2.name && w1.stats.totalPopulation === w2.stats.totalPopulation, `${w1.name} pop=${w1.stats.totalPopulation}`);
+      assert('3. Different seed produces different world fingerprint', w1.fingerprint !== wDiff.fingerprint, `(#${w1.fingerprint} !== #${wDiff.fingerprint})`);
+      assert('4. Ocean percentage matches configured target within 1.5%', Math.abs(w1.stats.oceanPct - 68) < 1.5, `actual=${w1.stats.oceanPct.toFixed(2)}%`);
+      assert('5. Continents & islands generated', w1.continents.length >= 1, `continents=${w1.continents.length}, islands=${w1.islands.length}`);
+      assert('6. Mountain ranges & highest summit extracted', w1.stats.mountainRangeCount > 0 && w1.stats.highestPoint.elevation > 1500, `ranges=${w1.stats.mountainRangeCount}, peak=${w1.stats.highestPoint.elevation}m`);
+      assert('7. River networks traced from drainage tree', w1.rivers.length > 10 && w1.stats.riverCount > 0, `rivers=${w1.rivers.length}, major=${w1.stats.riverCount}`);
+      assert('8. Volcanic basalt & impact crater masks synthesized', w1.fields.volcanicMask instanceof Float32Array && w1.fields.craterMask instanceof Float32Array && w1.fields.biome.includes(B.VOLCANIC), 'volcanic+craters active');
+      assert('9. Countries generated with capitals, flags, languages & currencies', w1.countries.length === 12 && w1.countries.every(c => c.name && c.currency?.symbol && c.language?.name && flagToSVG(c.flag).startsWith('<svg')), `countries=${w1.countries.length}`);
+      const allCitiesOnLand = w1.cities.every(ct => w1.fields.height[ct.cell] > 0);
+      assert('10. All cities placed on land cells with valid coordinates', w1.cities.length >= 24 && allCitiesOnLand, `cities=${w1.cities.length}`);
+      const sortedChrono = w1.history.every((e, i) => i === 0 || e.year >= w1.history[i - 1].year);
+      assert('11. Historical timeline sorted chronologically', w1.history.length >= 30 && sortedChrono, `events=${w1.history.length}`);
+      const layerCanvasesOk = BASE_LAYERS.every(l => {
+        const c = getLayerCanvas(w1, l.id);
+        return c && c.width === w1.W && c.height === w1.H;
+      });
+      assert('12. All 10 visualization layers (incl. Topographic, Geological, Wireframe) synthesize', layerCanvasesOk, `layers=${BASE_LAYERS.length}`);
+
+      // 3D Globe Viewer & Camera / Screenshot test
+      const host = document.getElementById('globe-test-host');
+      const gv = new GlobeViewer(host);
+      gv.setWorld(w1);
+      gv.flyToCell(120, 90, 1.5, 'Test Peak');
+      const picked = gv.pickAtScreen(240, 160);
+      const pngUrl = gv.exportScreenshotPNG();
+      assert('13. 3D GlobeViewer initializes, picks surface locations & exports PNG screenshot', !!picked && pngUrl?.startsWith('data:image/png'));
+      gv.dispose();
+
+      // Persistence
+      await clearAllSavedWorlds();
+      await saveWorldRecord(w1);
+      let list = await listSavedWorlds();
+      assert('14. Save world persists to storage & reproduces identical fingerprint', list.length === 1 && generateWorld(list[0].settings).fingerprint === w1.fingerprint);
+    } catch (e) {
+      failed++;
+      log.push(`[EXCEPTION] ${e.stack || e.message}`);
+    }
+
+    const out = document.getElementById('results');
+    out.textContent = log.join('\n') + `\n\nSUMMARY: ${failed === 0 ? 'ALL TESTS PASSED' : failed + ' FAILED'}`;
+  </script>
+</body>
+</html>
