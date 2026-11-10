@@ -142,8 +142,21 @@ export class MapViewport {
       this.requestDraw();
     }, { passive: false });
 
+    c.addEventListener('contextmenu', (e) => e.preventDefault());
     c.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || !this.world) return;
+      if (!this.world) return;
+      const rect = c.getBoundingClientRect();
+      const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+      if (this.brushMode && e.button === 0 && !e.shiftKey) {
+        this._brushing = true;
+        c.setPointerCapture(e.pointerId);
+        const w = this.screenToWorld(sx, sy);
+        if (w.inside && this.cb.onBrushStart) this.cb.onBrushStart(w);
+        if (w.inside && this.cb.onBrushMove) this.cb.onBrushMove(w);
+        this.requestDraw();
+        return;
+      }
+      if (e.button !== 0 && e.button !== 2) return;
       this._dragging = true;
       this._dragMoved = false;
       this._downX = e.clientX; this._downY = e.clientY;
@@ -156,6 +169,14 @@ export class MapViewport {
       if (!this.world) return;
       const rect = c.getBoundingClientRect();
       const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+      const w = this.screenToWorld(sx, sy);
+      this.hoverCell = w.inside ? w : null;
+      if (this._brushing) {
+        if (w.inside && this.cb.onBrushMove) this.cb.onBrushMove(w);
+        this.cb.onHover && this.cb.onHover(this.hoverCell ? this.inspectAt(w.ix, w.iy, sx, sy) : null);
+        this.requestDraw();
+        return;
+      }
       if (this._dragging) {
         const dx = e.clientX - this._downX, dy = e.clientY - this._downY;
         if (Math.hypot(dx, dy) > 4) this._dragMoved = true;
@@ -165,13 +186,18 @@ export class MapViewport {
         this.cb.onCamera && this.cb.onCamera(this);
         this.requestDraw();
       } else {
-        const w = this.screenToWorld(sx, sy);
-        this.hoverCell = w.inside ? w : null;
         this.cb.onHover && this.cb.onHover(this.hoverCell ? this.inspectAt(w.ix, w.iy, sx, sy) : null);
+        if (this.brushMode) this.requestDraw();
       }
     });
 
     const endDrag = (e) => {
+      if (this._brushing) {
+        this._brushing = false;
+        this.cb.onBrushEnd && this.cb.onBrushEnd();
+        this.requestDraw();
+        return;
+      }
       if (!this._dragging) return;
       this._dragging = false;
       if (!this._dragMoved && this.world) {
@@ -295,9 +321,23 @@ export class MapViewport {
 
     if (this.overlays.graticule) this._drawGraticule(ctx, centerX, topY, mapW, mapH, kMin, kMax);
     if (this.overlays.rivers) this._drawRivers(ctx, centerX, topY, s, kMin, kMax);
+    this._drawRoadsAndLandmarks(ctx, centerX, topY, s, kMin, kMax);
+    if (this.highlightedRegion) this._drawHighlightedRegion(ctx, centerX, topY, s, kMin, kMax);
     if (this.selected?.type === 'country') this._drawCountryHighlight(ctx, this.selected.country, centerX, topY, s, kMin, kMax);
     if (this.overlays.cities) this._drawCities(ctx, centerX, topY, s, kMin, kMax);
     if (this.overlays.labels) this._drawLabels(ctx, centerX, topY, s, kMin, kMax);
+    if (this.brushMode && this.hoverCell) {
+      const pt = this.worldToScreen(this.hoverCell.x, this.hoverCell.y);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(230, 184, 76, 0.92)';
+      ctx.fillStyle = 'rgba(230, 184, 76, 0.14)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, Math.max(4, this.brushRadius * s), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
     if (this.pulse) {
       if (this._drawPulse(ctx, ts, centerX, topY, s)) keepAnimating = true;
     }
